@@ -23,9 +23,7 @@ const corsOptions = {
   credentials: false,
 };
 
-app.use(cors(corsOptions));
-app.options("/*", cors(corsOptions)); // ✅ FIXED HERE
-
+app.use(cors(corsOptions)); // ✅ THIS IS ENOUGH
 app.use(express.json());
 
 app.use("/api/auth", authRoutes);
