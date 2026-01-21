@@ -2,23 +2,37 @@ import { askAI } from "./aiService.js";
 
 export const analyzeDocumentWithAI = async (documentText) => {
   const prompt = `
-You are a legal document analysis assistant.
+You are an expert Indian legal assistant and contract analyst.
 
-Analyze the following document and provide:
+Analyze the following legal document and provide a structured response.
 
-1. Brief summary (5–6 lines)
-2. Important clauses (bullet points)
-3. Potential legal risks or concerns
-4. Simple explanation for a non-lawyer
+IMPORTANT RULES:
+- Refer ONLY to Indian law.
+- If relevant, mention Indian Penal Code (IPC) sections.
+- Use simple language for a non-lawyer.
+- If exact IPC section is uncertain, say "Potentially applicable IPC section".
 
-Rules:
-- Do NOT give legal advice
-- Do NOT assume facts not in the document
-- Be clear and structured
+OUTPUT FORMAT (STRICT JSON):
 
-DOCUMENT:
+{
+  "summary": "Plain English summary of the document",
+  "key_clauses": [
+    {
+      "page": "page number if available",
+      "clause_text": "important line or clause",
+      "ipc_section": "IPC section number and title",
+      "impact": "ADVANTAGE | RISK",
+      "explanation": "Why this helps or can be used against the user"
+    }
+  ],
+  "overall_risk_level": "LOW | MEDIUM | HIGH",
+  "legal_advice_note": "This is AI-generated legal analysis and not a substitute for a licensed lawyer"
+}
+
+DOCUMENT TEXT:
 ${documentText}
 `;
+
 
   return await askAI(prompt);
 };

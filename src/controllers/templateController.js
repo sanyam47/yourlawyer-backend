@@ -4,15 +4,15 @@ export const generateTemplate = async (req, res) => {
   try {
     const { type, details } = req.body;
 
-    if (!type) {
-      return res.status(400).json({ message: "Template type is required" });
+    if (!type || !details) {
+      return res.status(400).json({ message: "Missing template data" });
     }
 
-    const result = await generateTemplateAI(type, details);
+    const template = await generateTemplateAI({ type, details });
 
-    res.json({ template: result });
-  } catch (err) {
-    console.error(err);
+    res.status(200).json({ template });
+  } catch (error) {
+    console.error("❌ Template Controller Error:", error);
     res.status(500).json({ message: "Template generation failed" });
   }
 };

@@ -2,23 +2,41 @@ import { askAI } from "./aiService.js";
 
 export const analyzeDocumentWithAI = async (documentText) => {
   const prompt = `
-You are a legal document analysis assistant.
+You are an expert Indian contract and legal document analyst.
 
-Analyze the following document and provide:
+CRITICAL INSTRUCTION:
+You MUST respond ONLY in valid JSON.
+DO NOT include markdown, bullet points, explanations, or extra text.
+DO NOT write anything outside JSON.
+If JSON format is broken, the response is INVALID.
 
-1. Brief summary (5–6 lines)
-2. Important clauses (bullet points)
-3. Potential legal risks or concerns
-4. Simple explanation for a non-lawyer
+JSON FORMAT REQUIRED:
 
-Rules:
-- Do NOT give legal advice
-- Do NOT assume facts not in the document
-- Be clear and structured
+{
+  "summary": "",
+  "key_clauses": [
+    {
+      "page": "",
+      "clause_text": "",
+      "impact": "ADVANTAGE | RISK | LEGAL OBLIGATION",
+      "explanation": ""
+    }
+  ],
+  "overall_risk_level": "LOW | MEDIUM | HIGH",
+  "legal_advice_note": ""
+}
+
+LEGAL RULES:
+- Apply Indian civil law only.
+- Focus on Indian Contract Act, 1872 and rental principles.
+- Clearly state whether each clause benefits the user or can be used against them.
+- Use simple language for a non-lawyer.
 
 DOCUMENT:
 ${documentText}
 `;
+
+  console.log("🔥 USING CONTRACT-ONLY LEGAL PROMPT (NO IPC)");
 
   return await askAI(prompt);
 };

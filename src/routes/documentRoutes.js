@@ -4,18 +4,49 @@ import {
   getUserDocuments,
   analyzeDocument,
 } from "../controllers/documentController.js";
+
 import { verifyToken } from "../middleware/authMiddleware.js";
+import { askQuestionAboutDocument } from "../controllers/documentQAController.js";
 import { upload } from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
 
-// Upload document
-router.post("/upload", verifyToken, upload.single("file"), uploadDocument);
+/* =======================
+   UPLOAD DOCUMENT
+======================= */
+router.post(
+  "/upload",
+  verifyToken,
+  upload.single("file"),
+  uploadDocument
+);
 
-// Get user documents
-router.get("/", verifyToken, getUserDocuments);
+/* =======================
+   ANALYZE DOCUMENT
+======================= */
+router.post(
+  "/analyze",
+  verifyToken,
+  upload.single("file"),
+  analyzeDocument
+);
 
-// 🔥 AI document analysis
-router.post("/analyze", verifyToken, upload.single("file"), analyzeDocument);
+/* =======================
+   ASK QUESTIONS
+======================= */
+router.post(
+  "/ask",
+  verifyToken,
+  askQuestionAboutDocument
+);
+
+/* =======================
+   GET USER DOCUMENTS
+======================= */
+router.get(
+  "/",
+  verifyToken,
+  getUserDocuments
+);
 
 export default router;

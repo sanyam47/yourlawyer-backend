@@ -1,23 +1,42 @@
-import OpenAI from "openai";
+import fetch from "node-fetch";
 
-export const generateTemplateAI = async (type, details) => {
-  const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
-  });
+export const generateTemplateAI = async ({ type, details }) => {
+  try {
+    const prompt = `
+You are a professional legal assistant.
 
-  const prompt = `
-Generate a professional legal ${type}.
+Generate a formal legal document.
+
+Template Type:
+${type}
+
 Details:
-${details || "Standard Indian legal format"}
+${details}
 
-Use clear clauses and headings.
-Do not include explanations.
+Make it legally structured, clear, and professional.
 `;
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    messages: [{ role: "user", content: prompt }],
-  });
+    const response = await fetch("http://localhost:11434/api/generate", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "mistral",     // ✅ change if you use another model
+        prompt,
+        stream: false,
+      }),
+    });
 
-  return response.choices[0].message.content;
+    const data = await response.json();
+
+    if (!data.response) {
+      throw new Error("No response from Ollama");
+    }
+
+    return data.response;
+  } catch (error) {
+    console.error("❌ Ollama Template Error:", error);
+    throw new Error("AI template generation failed");
+  }
 };

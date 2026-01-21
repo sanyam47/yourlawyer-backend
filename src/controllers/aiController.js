@@ -8,7 +8,11 @@ export const testAIController = async (req, res) => {
 
     res.json({ success: true, reply });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "AI failed" });
+    console.error("❌ FULL GEMINI ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      message: err.message || "AI failed",
+    });
   }
 };

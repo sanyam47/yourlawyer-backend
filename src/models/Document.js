@@ -7,31 +7,42 @@ const documentSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+
     originalName: {
       type: String,
       required: true,
     },
+
     filePath: {
       type: String,
       required: true,
     },
+
     fileType: {
       type: String,
-      enum: ["pdf", "doc", "docx", "txt"],
+      enum: ["pdf", "image", "other"],
       required: true,
     },
+
     status: {
       type: String,
       enum: ["uploaded", "analyzed"],
       default: "uploaded",
     },
+
+    // 🔑 THIS ENABLES Q&A
+    extractedText: {
+      type: String,
+      default: "",
+    },
+
     analysisResult: {
-      type: Object, // later store AI insights here
+      type: Object,
+      default: null,
     },
   },
   { timestamps: true }
 );
 
 const Document = mongoose.model("Document", documentSchema);
-
 export default Document;

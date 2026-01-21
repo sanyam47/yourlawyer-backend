@@ -1,0 +1,11 @@
+RENT AGREEMENT
+
+This agreement is between {{LANDLORD_NAME}} and {{TENANT_NAME}}.
+
+Property Address: {{ADDRESS}}
+Monthly Rent: {{RENT}}
+
+Agreement Date: {{DATE}}
+
+Signature:
+{{LANDLORD_NAME}} / {{TENANT_NAME}}
