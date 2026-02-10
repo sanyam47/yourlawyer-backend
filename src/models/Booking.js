@@ -9,18 +9,34 @@ const bookingSchema = new mongoose.Schema(
     },
     lawyer: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Lawyer",
+      ref: "User",
       required: true,
     },
-    caseDescription: {
-      type: String,
-      required: true,
-    },
+
+    message: String,
+
+    date: Date,
+    timeSlot: String,
+
     status: {
       type: String,
-      enum: ["pending", "accepted", "rejected"],
+      enum: ["pending", "confirmed", "rejected"],
       default: "pending",
     },
+
+    paymentStatus: {
+      type: String,
+      enum: ["unpaid", "paid"],
+      default: "unpaid",
+    },
+
+    chatEnabled: {
+      type: Boolean,
+      default: false,
+    },
+
+    rating: Number,
+    review: String,
   },
   { timestamps: true }
 );

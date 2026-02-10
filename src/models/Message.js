@@ -2,21 +2,23 @@ import mongoose from "mongoose";
 
 const messageSchema = new mongoose.Schema(
   {
-    caseId: {
+    booking: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: "Case",
+      ref: "Booking",
       required: true,
     },
-
     sender: {
-      type: String,
-      enum: ["user", "ai"],
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       required: true,
     },
-
     text: {
       type: String,
       required: true,
+    },
+    isRead: {
+      type: Boolean,
+      default: false,
     },
   },
   { timestamps: true }

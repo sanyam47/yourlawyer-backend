@@ -1,105 +1,110 @@
-// ================================
-// 🌱 ENV SETUP (ES MODULE SAFE)
-// ================================
 import dotenv from "dotenv";
+dotenv.config();
+import aiRoutes from "./routes/aiRoutes.js";
+
+import express from "express";
+import cors from "cors";
+import http from "http";
+import { Server } from "socket.io";
 import path from "path";
 import { fileURLToPath } from "url";
+import connectDB from "./config/db.js";
 
-// Fix __dirname for ES modules
+// ================= PATH FIX =================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load .env from project root
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-
-// ================================
-// 🚀 IMPORTS
-// ================================
-import express from "express";
-import cors from "cors";
-
-import connectDB from "./config/db.js";
-
-// Routes
+// ================= ROUTES =================
 import authRoutes from "./routes/authRoutes.js";
-import documentRoutes from "./routes/documentRoutes.js";
-import templateFillRoutes from "./routes/templateFillRoutes.js";
-import summaryRoutes from "./routes/summaryRoutes.js";
-import recommendationRoutes from "./routes/recommendationRoutes.js";
-import onlineRecommendationRoutes from "./routes/onlineRecommendationRoutes.js";
-import messageRoutes from "./routes/messageRoutes.js";
-import aiRoutes from "./routes/aiRoutes.js";
-import chatRoutes from "./routes/chatRoutes.js";
-import templateRoutes from "./routes/templateRoutes.js";
-import lawyerRoutes from "./routes/lawyerRoutes.js";
 import bookingRoutes from "./routes/bookingRoutes.js";
-import caseRoutes from "./routes/caseRoutes.js";
+import profileRoutes from "./routes/profileRoutes.js";
+import lawyerRoutes from "./routes/lawyerRoutes.js";
+import templateRoutes from "./routes/templateRoutes.js";
+import documentRoutes from "./routes/documentRoutes.js";
 
-// ================================
-// ⚙️ APP SETUP
-// ================================
+// ================= MODELS =================
+import Message from "./models/Message.js";
+
 const app = express();
+const server = http.createServer(app);
 
-// ✅ FIXED CORS CONFIG
-const corsOptions = {
-  origin: [
-    "http://localhost:3000",
-    "http://localhost:3001", // ✅ frontend running here
-    "https://yourlawyer.vercel.app",
-  ],
-  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
-  credentials: true,
-};
-
-// ================================
-// 🧩 MIDDLEWARE
-// ================================
-app.use("/generated", express.static("generated"));
-app.use(cors(corsOptions));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
-
-// ================================
-// 🛣 ROUTES
-// ================================
-app.use("/api/auth", authRoutes);
-app.use("/api/documents", documentRoutes);
-app.use("/api/template-fill", templateFillRoutes);
-app.use("/api/summary", summaryRoutes);
-app.use("/api/recommendations", recommendationRoutes);
-app.use("/api/online-recommendations", onlineRecommendationRoutes);
-app.use("/api/messages", messageRoutes);
-app.use("/api/ai", aiRoutes);
-app.use("/api/chat", chatRoutes);
-app.use("/api/templates", templateRoutes);
-app.use("/api/lawyers", lawyerRoutes);
-app.use("/api/bookings", bookingRoutes);
-app.use("/api/cases", caseRoutes);
-
-// ================================
-// ❤️ HEALTH CHECK
-// ================================
-app.get("/", (req, res) => {
-  res.status(200).send("✅ YourLawyer Backend is Running Successfully!");
-});
-
-// ================================
-// 🔐 ENV VALIDATION
-// ================================
 const PORT = process.env.PORT || 5000;
 const MONGO_URI = process.env.MONGO_URI;
 
-if (!MONGO_URI) {
-  console.error("❌ MONGO_URI missing in .env");
-  process.exit(1);
-}
-
-// ================================
-// 🗄 DATABASE + SERVER START
-// ================================
-connectDB(MONGO_URI);
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
+// ================= SOCKET =================
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000",
+    methods: ["GET", "POST"],
+  },
 });
+
+// 🔥 Make io available in routes
+app.set("io", io);
+
+io.on("connection", (socket) => {
+  console.log("🔌 User connected:", socket.id);
+
+  socket.on("join_room", (bookingId) => {
+    if (!bookingId) return;
+    socket.join(bookingId);
+  });
+
+  socket.on("send_message", async (data) => {
+    try {
+      if (!data.bookingId || !data.senderId || !data.message) return;
+
+      const savedMessage = await Message.create({
+        booking: data.bookingId,
+        sender: data.senderId,
+        text: data.message,
+      });
+
+      io.to(data.bookingId).emit("receive_message", savedMessage);
+    } catch (error) {
+      console.error("Message save error:", error.message);
+    }
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ User disconnected:", socket.id);
+  });
+});
+
+// ================= MIDDLEWARE =================
+app.use(cors({ origin: "http://localhost:3000" }));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+app.use(
+  "/uploads",
+  express.static(path.join(__dirname, "../uploads"))
+);
+
+// ================= ROUTES =================
+app.use("/api/auth", authRoutes);
+app.use("/api/bookings", bookingRoutes);
+app.use("/api/profile", profileRoutes);
+app.use("/api/lawyers", lawyerRoutes);
+app.use("/api/ai-chat", aiRoutes);
+app.use("/api/template", templateRoutes);
+app.use("/api/documents", documentRoutes);
+
+// ================= HEALTH CHECK =================
+app.get("/", (req, res) => {
+  res.json({ message: "Backend running" });
+});
+
+// ================= START SERVER =================
+const startServer = async () => {
+  try {
+    await connectDB(MONGO_URI);
+    server.listen(PORT, () => {
+      console.log(`🚀 Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error("Server start failed:", err.message);
+  }
+};
+
+startServer();

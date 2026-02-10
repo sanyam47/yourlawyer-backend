@@ -7,7 +7,7 @@ import {
 
 import { verifyToken } from "../middleware/authMiddleware.js";
 import { askQuestionAboutDocument } from "../controllers/documentQAController.js";
-import { upload } from "../middleware/uploadMiddleware.js";
+import upload from "../middleware/uploadMiddleware.js";
 
 const router = express.Router();
 

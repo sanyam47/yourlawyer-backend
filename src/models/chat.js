@@ -1,5 +1,13 @@
 import mongoose from "mongoose";
 
+const messageSchema = new mongoose.Schema(
+  {
+    role: String,
+    content: String,
+  },
+  { _id: false }
+);
+
 const chatSchema = new mongoose.Schema(
   {
     userId: {
@@ -7,10 +15,15 @@ const chatSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
-    message: {
+    name: {
       type: String,
       required: true,
     },
+    description: {
+      type: String,
+      default: "",
+    },
+    messages: [messageSchema],
   },
   { timestamps: true }
 );

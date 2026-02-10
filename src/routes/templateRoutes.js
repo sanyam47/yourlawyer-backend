@@ -1,49 +1,65 @@
 import express from "express";
-import { verifyToken } from "../middleware/authMiddleware.js";
-import Template from "../models/Template.js";
+import axios from "axios";
 
 const router = express.Router();
 
-/* =========================
-   CREATE TEMPLATE
-========================= */
-router.post("/", verifyToken, async (req, res) => {
+router.post("/", async (req, res) => {
   try {
-    const { title, content } = req.body;
+    const { type, partyA, partyB, details } = req.body;
 
-    if (!title || !content) {
-      return res
-        .status(400)
-        .json({ message: "Title and content are required" });
-    }
+    const prompt = `
+Generate a professional ${type} under Indian law.
 
-    const template = await Template.create({
-      userId: req.user._id || req.user.id,
-      title,
-      content,
+Party A: ${partyA}
+Party B: ${partyB}
+
+Details:
+${details}
+
+Make it legally structured with headings and clauses.
+`;
+
+    const response = await axios.post(
+      "http://127.0.0.1:11434/api/generate",
+      {
+        model: "mistral",
+        prompt,
+        stream: false,
+      }
+    );
+
+    res.json({
+      document: response.data.response,
     });
 
-    res.status(201).json(template);
   } catch (error) {
-    console.error("❌ Create template error:", error);
-    res.status(500).json({ message: "Failed to create template" });
-  }
-});
-
-/* =========================
-   GET USER TEMPLATES
-========================= */
-router.get("/", verifyToken, async (req, res) => {
-  try {
-    const templates = await Template.find({
-      userId: req.user._id || req.user.id,
-    }).sort({ createdAt: -1 });
-
-    res.json(templates);
-  } catch (error) {
-    console.error("❌ Fetch templates error:", error);
-    res.status(500).json({ message: "Failed to fetch templates" });
+    console.error("TEMPLATE ERROR:", error.message);
+    res.status(500).json({ error: "Template generation failed" });
   }
 });
 
 export default router;
+
+import fs from "fs";
+import path from "path";
+import PDFDocument from "pdfkit";
+
+router.post("/pdf", async (req, res) => {
+  try {
+    const { content } = req.body;
+
+    const doc = new PDFDocument();
+    const filePath = path.join("generated.pdf");
+
+    doc.pipe(fs.createWriteStream(filePath));
+    doc.fontSize(12).text(content);
+    doc.end();
+
+    doc.on("finish", () => {
+      res.download(filePath);
+    });
+
+  } catch (err) {
+    res.status(500).json({ error: "PDF failed" });
+  }
+});
