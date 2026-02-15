@@ -30,7 +30,6 @@ const documentSchema = new mongoose.Schema(
       default: "uploaded",
     },
 
-    // 🔑 THIS ENABLES Q&A
     extractedText: {
       type: String,
       default: "",
@@ -40,6 +39,14 @@ const documentSchema = new mongoose.Schema(
       type: Object,
       default: null,
     },
+
+    // ✅ REAL RAG STORAGE
+    embeddings: [
+      {
+        chunk: String,
+        vector: [Number],
+      },
+    ],
   },
   { timestamps: true }
 );

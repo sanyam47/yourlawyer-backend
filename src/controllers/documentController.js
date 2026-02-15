@@ -1,8 +1,18 @@
 import Document from "../models/Document.js";
-import fs from "fs";
-import { execFile } from "child_process";
 import { analyzeDocumentWithAI } from "../services/documentAIService.js";
 import { extractTextFromImage } from "../utils/ocr.js";
+import { generateEmbedding } from "../services/embeddingService.js";
+
+/* =======================
+   HELPER: SPLIT INTO CHUNKS
+======================= */
+function splitIntoChunks(text, size = 500) {
+  const chunks = [];
+  for (let i = 0; i < text.length; i += size) {
+    chunks.push(text.slice(i, i + size));
+  }
+  return chunks;
+}
 
 /* =======================
    UPLOAD DOCUMENT
@@ -38,7 +48,7 @@ export const uploadDocument = async (req, res) => {
 };
 
 /* =======================
-   ANALYZE DOCUMENT  ✅ FIXED
+   ANALYZE DOCUMENT + CREATE EMBEDDINGS
 ======================= */
 export const analyzeDocument = async (req, res) => {
   try {
@@ -50,59 +60,69 @@ export const analyzeDocument = async (req, res) => {
     const mimeType = req.file.mimetype;
     let documentText = "";
 
-    /* IMAGE → OCR */
+    /* ================= IMAGE → OCR ================= */
     if (mimeType.startsWith("image/")) {
       documentText = await extractTextFromImage(filePath);
     }
 
-    /* PDF → TEXT → OCR FALLBACK */
+    /* ================= PDF → ImageMagick → OCR ================= */
     else if (mimeType === "application/pdf") {
-      const outputTxt = filePath.replace(/\.pdf$/i, ".txt");
-      const pdfToTextPath =
-        "C:\\poppler\\Library\\bin\\poppler-25.12.0\\Library\\bin\\pdftotext.exe";
+      const { execFile } = await import("child_process");
+      const outputImage = filePath.replace(".pdf", ".png");
 
       await new Promise((resolve, reject) => {
         execFile(
-          pdfToTextPath,
-          ["-layout", filePath, outputTxt],
+          "magick",
+          ["-density", "150", filePath + "[0]", "-quality", "100", outputImage],
           (err) => (err ? reject(err) : resolve())
         );
       });
 
-      if (fs.existsSync(outputTxt)) {
-        documentText = fs.readFileSync(outputTxt, "utf8");
-      }
-
-      // OCR fallback for scanned PDFs
-      if (!documentText || documentText.trim().length < 30) {
-        documentText = await extractTextFromImage(filePath);
-      }
+      documentText = await extractTextFromImage(outputImage);
     }
 
-    if (!documentText || documentText.trim().length < 30) {
+    /* ================= VALIDATION ================= */
+    if (!documentText || documentText.trim().length < 20) {
       return res.status(400).json({
         message: "Unable to extract readable text from document",
       });
     }
 
+    /* ================= SPLIT INTO CHUNKS ================= */
+    const chunks = splitIntoChunks(documentText, 800);
+
+    const embeddings = [];
+
+    for (const chunk of chunks) {
+      const vector = await generateEmbedding(chunk);
+
+      embeddings.push({
+        chunk,
+        vector,
+      });
+    }
+
+    /* ================= AI ANALYSIS ================= */
     const analysis = await analyzeDocumentWithAI(documentText);
 
-    // ✅ CREATE DOCUMENT HERE (SOURCE OF TRUTH)
+    /* ================= SAVE TO DB ================= */
     const doc = await Document.create({
       user: req.user.id,
       originalName: req.file.originalname,
-      filePath: req.file.path,
+      filePath: filePath,
       fileType: mimeType.startsWith("image/") ? "image" : "pdf",
       extractedText: documentText,
       analysisResult: analysis,
+      embeddings, // 🔥 REAL VECTOR STORAGE
       status: "analyzed",
     });
 
     return res.status(200).json({
       success: true,
       analysis,
-      documentId: doc._id, // 🔑 FRONTEND NEEDS THIS
+      documentId: doc._id,
     });
+
   } catch (err) {
     console.error("Analyze error:", err);
     res.status(500).json({ message: "Analysis failed" });
@@ -117,9 +137,10 @@ export const getUserDocuments = async (req, res) => {
     const docs = await Document.find({ user: req.user.id }).sort({
       createdAt: -1,
     });
+
     res.json(docs);
   } catch (err) {
+    console.error("Fetch error:", err);
     res.status(500).json({ message: "Failed to fetch documents" });
   }
 };
-
