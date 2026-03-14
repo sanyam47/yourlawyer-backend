@@ -104,6 +104,7 @@ ${chat.messages.map(m => `${m.role}: ${m.content}`).join("\n")}
        4️⃣ BUILD RECENT CONTEXT
     ========================== */
     const recentMessages = chat.messages.slice(-10);
+console.log("Retrieved Context:\n", documentContext);
 
     /* =========================
        5️⃣ CALL AI

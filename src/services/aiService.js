@@ -2,7 +2,11 @@ import fetch from "node-fetch";
 
 const OLLAMA_URL = "http://localhost:11434/api/generate";
 
-export async function askAI({ summary, messages, documentContext }) {
+export async function askAI({
+  summary = "",
+  messages = [],
+  documentContext = "",
+}) {
   try {
     const systemPrompt = `
 You are YourLawyer AI.
@@ -20,7 +24,11 @@ Relevant Document Context:
 ${documentContext || "No documents attached."}
 
 Recent Conversation:
-${messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
+${
+  messages.length > 0
+    ? messages.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n")
+    : "None"
+}
 
 AI:
 `;

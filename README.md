@@ -1,29 +1,90 @@
-# YourLawyer Backend
+# ⚖️ YourLawyer — AI Legal Intelligence Platform
 
-Backend API for the YourLawyer AI application.
+YourLawyer is a full‑stack AI-powered legal assistant that provides:
+- Instant legal guidance
+- AI document analysis
+- Semantic document Q&A
+- ML-powered Retrieval-Augmented Generation (RAG)
 
-## Features
-- Authentication (JWT-based)
-- AI-powered chat
-- Legal document analysis
-- Legal template generation
+Built with:
+- Next.js (Frontend)
+- Node.js + Express (Backend)
+- MongoDB
+- Ollama (Local LLM + Embeddings)
+- Vector Similarity Search
 
-## Tech Stack
+---
+
+## 🚀 Features
+
+### 🤖 AI Legal Chat
+- Conversational legal assistance
+- Memory summarization
+- Context-aware responses
+
+### 📄 Document Analysis
+- Upload PDFs or images
+- OCR text extraction
+- AI clause analysis
+- Risk detection
+
+### 🧠 Real ML-Powered RAG
+- Document text chunking
+- Embedding generation using `nomic-embed-text`
+- Vector storage in MongoDB
+- Cosine similarity semantic retrieval
+- Context-grounded LLM responses
+
+This is NOT keyword search.
+This is semantic vector retrieval.
+
+---
+
+## 🏗 Architecture
+
+User Upload → OCR → Text Extraction  
+→ Chunking  
+→ Embedding Generation (Ollama `nomic-embed-text`)  
+→ Store Vectors in MongoDB  
+→ User Question  
+→ Query Embedding  
+→ Cosine Similarity Search  
+→ Top Relevant Chunks  
+→ Inject into LLM (`mistral`)  
+→ Grounded AI Response  
+
+---
+
+## 🛠 Tech Stack
+
+**Frontend**
+- Next.js 14
+- Tailwind CSS
+
+**Backend**
 - Node.js
 - Express
-- MongoDB
-- JWT Authentication
-- AI APIs
+- MongoDB (Mongoose)
 
-## Project Structure
-src/
-├── controllers
-├── routes
-├── services
-├── models
-├── middleware
-└── index.js
+**AI Layer**
+- Ollama
+- mistral (generation)
+- nomic-embed-text (embeddings)
 
-## Notes
-- Environment variables are managed securely and are not included in this repository.
-- Frontend is deployed separately.
+---
+
+## 🧠 Machine Learning Components
+
+- Vector Embeddings
+- Cosine Similarity
+- Semantic Search
+- Retrieval-Augmented Generation (RAG)
+- Conversational Memory Summarization
+
+---
+
+## 📦 Installation
+
+### 1️⃣ Clone Repositories
+
+Frontend:

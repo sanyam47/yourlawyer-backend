@@ -1,48 +1,121 @@
+import { encrypt, decrypt } from "../utils/encryption.js";
 import express from "express";
 import axios from "axios";
-import Chat from "../models/Chat.js";
+
 import { verifyToken } from "../middleware/authMiddleware.js";
+import Chat from "../models/Chat.js";
+import { askAI } from "../services/aiService.js";
+import { generateEmbedding } from "../services/embeddingService.js";
+import { cosineSimilarity } from "../utils/cosineSimilarity.js";
 
 const router = express.Router();
 
-/* ======================================
-   TEMP AI CHAT (WITH SERP SUGGESTIONS)
-====================================== */
-router.post("/", async (req, res) => {
+
+
+/* =====================================================
+   SEND MESSAGE (DOES NOT CREATE NEW CHAT AUTOMATICALLY)
+===================================================== */
+
+router.post("/", verifyToken, async (req, res) => {
   try {
-    const { message } = req.body;
 
-    /* ===== AI RESPONSE (Ollama) ===== */
-    const aiResponse = await axios.post(
-      "http://127.0.0.1:11434/api/generate",
-      {
-        model: "mistral",
-        prompt: message,
-        stream: false,
+    const { message, chatId } = req.body;
+    const userId = req.user.id;
+
+    if (!message || message.trim() === "") {
+      return res.status(400).json({ message: "Message required" });
+    }
+
+    /* ================= DOCUMENT RAG ================= */
+
+let documentContext = "";
+
+if (chatId) {
+
+  const chat = await Chat.findOne({
+    _id: chatId,
+    userId
+  }).populate("documents");
+
+  if (chat && chat.documents?.length) {
+
+    const queryVector = await generateEmbedding(message);
+
+    let scoredChunks = [];
+
+    for (const doc of chat.documents) {
+      for (const item of doc.embeddings || []) {
+
+        if (!item.vector) continue;
+
+        const score = cosineSimilarity(queryVector, item.vector);
+
+        scoredChunks.push({
+          chunk: item.chunk,
+          score,
+        });
+
       }
-    );
+    }
 
-    const aiReply = aiResponse.data.response;
+    scoredChunks.sort((a, b) => b.score - a.score);
 
-    /* ===== SERP API SEARCH ===== */
-    const serpResponse = await axios.get(
-      "https://serpapi.com/search.json",
-      {
-        params: {
-          q: message + " Indian legal case law site:indiankanoon.org OR site:sci.gov.in",
-          api_key: process.env.SERP_API_KEY,
-          engine: "google",
-        },
-      }
-    );
+    const topChunks = scoredChunks.slice(0, 5);
 
-    const results =
-      serpResponse.data.organic_results?.slice(0, 3) || [];
+    documentContext = topChunks
+      .map(c => c.chunk)
+      .join("\n\n");
 
-    const similarCases = results.map((item) => ({
-      title: item.title,
-      link: item.link,
-    }));
+  }
+}
+
+
+    /* ================= AI RESPONSE ================= */
+
+    const aiReply = await askAI({
+      messages: [
+        {
+          role: "user",
+          content: message,
+        }
+      ],
+      documentContext,
+    });
+
+
+
+    /* ================= SERP SEARCH ================= */
+
+    let similarCases = [];
+
+    try {
+
+      const serpResponse = await axios.get(
+        "https://serpapi.com/search.json",
+        {
+          params: {
+            q:
+              message +
+              " Indian legal case law site:indiankanoon.org OR site:sci.gov.in",
+            api_key: process.env.SERP_API_KEY,
+            engine: "google",
+          },
+        }
+      );
+
+      const results =
+        serpResponse.data.organic_results?.slice(0, 3) || [];
+
+      similarCases = results.map(item => ({
+        title: item.title,
+        link: item.link,
+      }));
+
+    } catch {
+      similarCases = [];
+    }
+
+
 
     res.json({
       reply: aiReply,
@@ -50,91 +123,160 @@ router.post("/", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("AI ERROR:", error.message);
-    res.status(500).json({ error: "AI failed" });
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "AI failed",
+    });
+
   }
 });
 
-/* ======================================
-   REGISTER CHAT
-====================================== */
+
+
+/* =====================================================
+   SAVE NEW CHAT
+===================================================== */
+
 router.post("/register", verifyToken, async (req, res) => {
+
   try {
+
     const { name, description, messages } = req.body;
+
+    if (!name) {
+      return res.status(400).json({
+        message: "Name required",
+      });
+    }
 
     const chat = await Chat.create({
       userId: req.user.id,
       name,
       description: description || "",
-      messages: messages || [],
+      messages: (messages || []).map(msg => ({
+        role: msg.role,
+        content: encrypt(msg.content)
+      })),
     });
+
+    /* decrypt before returning */
+
+    chat.messages = chat.messages.map(msg => ({
+      role: msg.role,
+      content: decrypt(msg.content)
+    }));
 
     res.json(chat);
 
   } catch (error) {
-    res.status(500).json({ message: "Save failed" });
+
+    console.error(error);
+
+    res.status(500).json({
+      message: "Save failed",
+    });
+
   }
+
 });
 
-/* ======================================
-   GET SAVED CHATS
-====================================== */
-router.get("/saved", verifyToken, async (req, res) => {
-  const chats = await Chat.find({ userId: req.user.id })
-    .sort({ updatedAt: -1 });
 
-  res.json(chats);
-});
 
-/* ======================================
-   GET SINGLE CHAT
-====================================== */
-router.get("/:chatId", verifyToken, async (req, res) => {
-  const chat = await Chat.findById(req.params.chatId);
-  if (!chat) return res.status(404).json({ message: "Not found" });
-  res.json(chat);
-});
+/* ================= GET CHAT HISTORY ================= */
 
-/* ======================================
-   DELETE CHAT
-====================================== */
-router.delete("/:chatId", verifyToken, async (req, res) => {
-  await Chat.findByIdAndDelete(req.params.chatId);
-  res.json({ success: true });
-});
-
-/* ======================================
-   CONTINUE SAVED CHAT
-====================================== */
-router.post("/:chatId/message", verifyToken, async (req, res) => {
+router.get("/history", verifyToken, async (req, res) => {
   try {
-    const { message } = req.body;
 
-    const chat = await Chat.findById(req.params.chatId);
-    if (!chat) return res.status(404).json({ message: "Chat not found" });
+    const chats = await Chat.find({
+      userId: req.user.id,
+    }).sort({ createdAt: -1 });
 
-    chat.messages.push({ role: "user", content: message });
+    const decryptedChats = chats.map(chat => ({
+      ...chat._doc,
+      messages: chat.messages.map(msg => ({
+        role: msg.role,
+        content: decrypt(msg.content)
+      }))
+    }));
 
-    const response = await axios.post(
-      "http://127.0.0.1:11434/api/generate",
-      {
-        model: "mistral",
-        prompt: message,
-        stream: false,
-      }
-    );
+    res.json(decryptedChats);
 
-    const aiReply = response.data.response;
-
-    chat.messages.push({ role: "assistant", content: aiReply });
-
-    await chat.save();
-
-    res.json({ reply: aiReply });
-
-  } catch (error) {
-    res.status(500).json({ message: "AI failed" });
+  } catch (err) {
+    res.status(500).json({
+      message: "Failed to load chat history",
+    });
   }
 });
+
+
+
+/* =====================================================
+   GET SINGLE CHAT
+===================================================== */
+
+router.get("/:chatId", verifyToken, async (req, res) => {
+
+  try {
+
+    const chat = await Chat.findOne({
+      _id: req.params.chatId,
+      userId: req.user.id
+    });
+
+    if (!chat) {
+      return res.status(404).json({
+        message: "Chat not found",
+      });
+    }
+
+    chat.messages = chat.messages.map(msg => ({
+      role: msg.role,
+      content: decrypt(msg.content)
+    }));
+
+    res.json(chat);
+
+  } catch {
+
+    res.status(500).json({
+      message: "Failed",
+    });
+
+  }
+
+});
+
+
+
+/* =====================================================
+   DELETE CHAT
+===================================================== */
+
+router.delete("/:chatId", verifyToken, async (req, res) => {
+
+  try {
+
+    await Chat.findOneAndDelete({
+      _id: req.params.chatId,
+      userId: req.user.id
+    });
+
+    res.json({
+      success: true,
+    });
+
+  } catch {
+
+    res.status(500).json({
+      message: "Delete failed",
+    });
+
+  }
+
+});
+
+
 
 export default router;
